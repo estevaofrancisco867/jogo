@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Sonic 3D Prototype</title>
+  <meta charset="UTF-8">
+  <title>Sonic 2.5D</title>
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; }
@@ -11,98 +11,89 @@
 <body>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
-  // Setup básico da cena, câmera e renderizador
+  // Cena, câmera, renderizador
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb); // Céu azul claro
+  scene.background = new THREE.Color(0x87ceeb);
 
-  const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   camera.position.set(0, 2, 5);
 
-  const renderer = new THREE.WebGLRenderer({antialias:true});
+  const renderer = new THREE.WebGLRenderer({antialias: true});
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  // Luz ambiente e direcional
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambientLight);
+  // Luz
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(5, 10, 7);
+  scene.add(light);
 
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(5, 10, 7);
-  scene.add(directionalLight);
+  // Chão
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(100, 100),
+    new THREE.MeshStandardMaterial({color: 0x228822})
+  );
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
 
-  // Chão simples
-  const floorGeometry = new THREE.PlaneGeometry(100, 100);
-  const floorMaterial = new THREE.MeshStandardMaterial({color: 0x228822});
-  const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-  floor.rotation.x = -Math.PI / 2;
-  scene.add(floor);
+  // Criar um plano com textura PNG do Sonic
+  const textureLoader = new THREE.TextureLoader();
+  const sonicTexture = textureLoader.load('sonic.png');
 
-  // Variável para o player (modelo carregado)
-  let player;
-
-  // Carregar modelo glTF do Sonic (ou personagem)
-  const loader = new THREE.GLTFLoader();
-  loader.load('sonic.glb', function(gltf) {
-    player = gltf.scene;
-    player.scale.set(0.5, 0.5, 0.5);  // ajuste o tamanho conforme necessário
-    player.position.y = 0;  // para ficar no chão
-    scene.add(player);
-  }, undefined, function(error) {
-    console.error('Erro ao carregar o modelo:', error);
+  const playerMaterial = new THREE.MeshBasicMaterial({
+    map: sonicTexture,
+    transparent: true,
+    side: THREE.DoubleSide
   });
 
-  // Controle básico do personagem
-  const moveSpeed = 5;
-  const keysPressed = {};
+  const playerGeometry = new THREE.PlaneGeometry(1.5, 2.5); // ajuste tamanho da imagem
+  const player = new THREE.Mesh(playerGeometry, playerMaterial);
+  player.position.y = 1.25; // altura do centro da imagem
+  scene.add(player);
 
-  window.addEventListener('keydown', (e) => { keysPressed[e.key.toLowerCase()] = true; });
-  window.addEventListener('keyup', (e) => { keysPressed[e.key.toLowerCase()] = false; });
+  // Movimento
+  const speed = 5;
+  const keys = {};
 
-  // Loop de animação
+  window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+  window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
   const clock = new THREE.Clock();
 
   function animate() {
-    requestAnimationFrame(animate);
     const delta = clock.getDelta();
 
-    if(player){
-      let forward = 0;
-      let sideways = 0;
+    let forward = 0;
+    let side = 0;
 
-      if(keysPressed['w'] || keysPressed['arrowup']) forward += 1;
-      if(keysPressed['s'] || keysPressed['arrowdown']) forward -= 1;
-      if(keysPressed['a'] || keysPressed['arrowleft']) sideways -= 1;
-      if(keysPressed['d'] || keysPressed['arrowright']) sideways += 1;
+    if (keys['w'] || keys['arrowup']) forward += 1;
+    if (keys['s'] || keys['arrowdown']) forward -= 1;
+    if (keys['a'] || keys['arrowleft']) side -= 1;
+    if (keys['d'] || keys['arrowright']) side += 1;
 
-      if(forward !== 0 || sideways !== 0){
-        const angle = Math.atan2(sideways, forward);
-        player.rotation.y = angle;
-
-        player.position.x += Math.sin(angle) * moveSpeed * delta;
-        player.position.z += Math.cos(angle) * moveSpeed * delta;
-      }
-
-      // Manter no chão (supondo modelo com base em y=0)
-      player.position.y = 0;
-
-      // Atualizar câmera para seguir player
-      camera.position.x = player.position.x - Math.sin(player.rotation.y) * 5;
-      camera.position.z = player.position.z - Math.cos(player.rotation.y) * 5;
-      camera.position.y = player.position.y + 3;
-      camera.lookAt(player.position);
+    if (forward !== 0 || side !== 0) {
+      const angle = Math.atan2(side, forward);
+      player.rotation.y = angle;
+      player.position.x += Math.sin(angle) * speed * delta;
+      player.position.z += Math.cos(angle) * speed * delta;
     }
 
+    // Câmera segue o jogador
+    camera.position.x = player.position.x - Math.sin(player.rotation.y) * 5;
+    camera.position.z = player.position.z - Math.cos(player.rotation.y) * 5;
+    camera.position.y = player.position.y + 3;
+    camera.lookAt(player.position);
+
     renderer.render(scene, camera);
+    requestAnimationFrame(animate);
   }
 
   animate();
 
-  // Ajuste responsivo
+  // Responsivo
   window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
@@ -110,3 +101,4 @@
 
 </body>
 </html>
+
